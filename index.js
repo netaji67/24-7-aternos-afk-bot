@@ -1,217 +1,96 @@
 const bedrock = require("bedrock-protocol");
-const config = require("./config.json");
+const settings = require("./settings.json");
 
 let client = null;
-let reconnectTimer = null;
-let jumpTimer = null;
-let leaveTimer = null;
-
-let connected = false;
+let reconnecting = false;
 
 function log(message) {
-    console.log(`[${new Date().toLocaleTimeString()}] ${message}`);
+    console.log(`[BOT] ${message}`);
 }
 
-function connectBot() {
+function startBot() {
 
-    log(`Connecting to ${config.host}:${config.port}...`);
+    log(`Connecting to ${settings.host}:${settings.port}...`);
 
     try {
 
         client = bedrock.createClient({
-            host: config.host,
-            port: config.port,
-            username: config.username,
+            host: settings.host,
+            port: settings.port,
+            username: settings.username,
             offline: true
         });
 
         client.on("join", () => {
 
-            connected = true;
+            reconnecting = false;
 
-            log("Bot joined the server!");
+            log("Successfully joined the Bedrock server!");
 
-            startAFK();
+        });
 
-            startLeaveRejoin();
+        client.on("text", (packet) => {
+
+            if (packet.message) {
+                console.log(`[CHAT] ${packet.message}`);
+            }
+
         });
 
         client.on("disconnect", (packet) => {
 
-            connected = false;
-
-            log("Disconnected from server.");
-
-            stopTimers();
+            log("Bot disconnected from server.");
 
             reconnect();
+
         });
 
         client.on("error", (error) => {
 
             log(`Error: ${error.message}`);
-        });
 
-        client.on("text", (packet) => {
-
-            if (!packet.message) return;
-
-            log(`[CHAT] ${packet.message}`);
         });
 
     } catch (error) {
 
-        log(`Connection error: ${error.message}`);
+        log(`Connection failed: ${error.message}`);
 
         reconnect();
+
     }
 }
 
 
 function reconnect() {
 
-    if (!config.reconnect) return;
+    if (!settings.reconnect) return;
 
-    if (reconnectTimer) return;
+    if (reconnecting) return;
 
-    log(`Reconnecting in ${config.reconnectDelay / 1000} seconds...`);
+    reconnecting = true;
 
-    reconnectTimer = setTimeout(() => {
+    log(`Reconnecting in ${settings.reconnectDelay / 1000} seconds...`);
 
-        reconnectTimer = null;
+    setTimeout(() => {
 
-        connectBot();
+        reconnecting = false;
 
-    }, config.reconnectDelay);
-}
+        startBot();
 
-
-function startAFK() {
-
-    if (!config.afk) return;
-
-    stopAFK();
-
-    log("AFK mode started.");
-
-    jumpTimer = setInterval(() => {
-
-        if (!connected || !client) return;
-
-        try {
-
-            client.queue("player_auth_input", {
-                pitch: 0,
-                yaw: 0,
-                position: {
-                    x: 0,
-                    y: 0,
-                    z: 0
-                },
-                move_vector: {
-                    x: 0,
-                    z: 0
-                },
-                head_yaw: 0,
-                input_data: {
-                    type: "bitset",
-                    value: ["jumping"]
-                },
-                input_mode: 2,
-                play_mode: 0,
-                interaction_model: 0,
-                tick: BigInt(Date.now())
-            });
-
-            log("AFK jump.");
-
-        } catch (error) {
-
-            log(`AFK error: ${error.message}`);
-        }
-
-    }, config.jumpInterval);
-}
-
-
-function stopAFK() {
-
-    if (jumpTimer) {
-
-        clearInterval(jumpTimer);
-
-        jumpTimer = null;
-    }
-}
-
-
-function startLeaveRejoin() {
-
-    if (!config.leaveRejoin) return;
-
-    if (leaveTimer) return;
-
-    const time = config.leaveAfterMinutes * 60 * 1000;
-
-    log(`Leave/rejoin scheduled in ${config.leaveAfterMinutes} minutes.`);
-
-    leaveTimer = setTimeout(() => {
-
-        log("Leaving server for scheduled reconnect...");
-
-        stopTimers();
-
-        if (client) {
-
-            try {
-                client.close();
-            } catch (error) {}
-        }
-
-        setTimeout(() => {
-
-            connectBot();
-
-        }, config.rejoinAfterSeconds * 1000);
-
-    }, time);
-}
-
-
-function stopTimers() {
-
-    stopAFK();
-
-    if (leaveTimer) {
-
-        clearTimeout(leaveTimer);
-
-        leaveTimer = null;
-    }
+    }, settings.reconnectDelay);
 }
 
 
 process.on("SIGINT", () => {
 
-    log("Stopping bot...");
-
-    stopTimers();
+    log("Bot stopped.");
 
     if (client) {
-
-        try {
-            client.close();
-        } catch (error) {}
+        client.close();
     }
 
     process.exit();
 });
 
 
-process.on("uncaughtException", (error) => {
-
-    log(`Uncaught error: ${error.message}`);
-});
-
-
-connectBot();
+startBot();
