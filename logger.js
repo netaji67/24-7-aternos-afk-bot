@@ -1,18 +1,16 @@
-const logs = [];
+function log(message) {
+    const time = new Date().toLocaleString();
 
-function addLog(message) {
-  const time = new Date().toLocaleTimeString();
-  const formatted = `[${time}] ${message}`;
-
-  console.log(formatted); // still goes to Render logs
-
-  logs.push(formatted);
-
-  if (logs.length > 300) logs.shift();
+    console.log(`[${time}] ${message}`);
 }
 
-function getLogs() {
-  return logs;
+function error(message) {
+    const time = new Date().toLocaleString();
+
+    console.error(`[${time}] ERROR: ${message}`);
 }
 
-module.exports = { addLog, getLogs };
+module.exports = {
+    log,
+    error
+};
