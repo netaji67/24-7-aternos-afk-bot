@@ -6,6 +6,10 @@
   "reconnect": true,
   "reconnectDelay": 10000,
 
+  "leaveRejoin": true,
+  "leaveAfterMinutes": 30,
+  "rejoinAfterSeconds": 10,
+
   "afk": true,
   "jumpInterval": 5000
 }
